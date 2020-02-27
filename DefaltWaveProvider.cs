@@ -7,7 +7,7 @@ namespace Defalt {
     public class DefaltSampleProvider : ISampleProvider {
         private const float PitchStepsPerSecond = 30.0f;
         private const float MinShiftDelay = 0.5f;
-        private const float MaxShiftDelay = 0.8f;
+        private const float MaxShiftDelay = 3.0f;
         private const float VolumeSlice = 0.1f;
         //private const float VolThreshold = 0.4f;
         private const float VolBase = 0.4f;
@@ -64,7 +64,7 @@ namespace Defalt {
             var srcDistortion = new DmoEffectWaveProvider<DmoDistortion, DmoDistortion.Params>(srcChorus2);
             var distortion = srcDistortion.EffectParams;
             distortion.Gain = -10.0f;
-            distortion.Edge = 20.0f;
+            distortion.Edge = 10.0f;
             distortion.PostEqCenterFrequency = 5000.0f;
             distortion.PostEqBandWidth = 700.0f;
             distortion.PreLowPassCutoff = 6000.0f;
@@ -84,7 +84,7 @@ namespace Defalt {
             if (_shiftTimer <= 0) {
                 _shiftTimer = _minShiftDelay + (int) (_r.NextDouble() * _rangeShiftDelay);
                 if (_r.NextDouble() < 0.5)
-                    shiftTarget = (float) (0.7f + _r.NextDouble() * 0.1f);
+                    shiftTarget = (float) (0.8f + _r.NextDouble() * 0.1f);
                 else
                     shiftTarget = (float) (1.2f + _r.NextDouble() * 0.1f);
             }
