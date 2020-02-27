@@ -6,14 +6,16 @@ using NAudio.Wave.SampleProviders;
 namespace Defalt {
     public class DefaltSampleProvider : ISampleProvider {
         private const float ModPeriod = 1.3f;
-        private const float ModAmplitude = 0.2f;
+        private const float ModAmplitude = 0.1f;
         private const float PitchStepsPerSecond = 30.0f;
         private const float MinShiftDelay = 0.5f;
         private const float MaxShiftDelay = 3.0f;
         private const float VolumeSlice = 0.1f;
         //private const float VolThreshold = 0.4f;
-        private const float VolBase = 0.4f;
+        private const float VolBase = 0.3f;
         private const float VolRange = 0.2f;
+        private const float AbsoluteMin = 0.8f;
+        private const float AbsoluteMax = 1.5f;
 
         //private const float ReverseMax = 0.2f;
         private readonly ISampleProvider _sourceSampleProvider;
@@ -34,7 +36,14 @@ namespace Defalt {
         private float _realBase;
 
         public DefaltSampleProvider(ISampleProvider sourceSampleProvider, float threshold) {
-            _shifter = new SmbPitchShiftingSampleProvider(sourceSampleProvider,
+            var srcDistortion = new DmoEffectWaveProvider<DmoDistortion, DmoDistortion.Params>(sourceSampleProvider.ToWaveProvider());
+            var distortion = srcDistortion.EffectParams;
+            distortion.Gain = -5.0f;
+            distortion.Edge = 5.0f;
+            distortion.PostEqCenterFrequency = 5000.0f;
+            distortion.PostEqBandWidth = 150.0f;
+            distortion.PreLowPassCutoff = 7000.0f;
+            _shifter = new SmbPitchShiftingSampleProvider(srcDistortion.ToSampleProvider(),
                 512, 10, 0.8f);
             //_reverseStep = (int) (ReverseMax * sourceWaveProvider.WaveFormat.SampleRate);
             _periodInSamples = ModPeriod * sourceSampleProvider.WaveFormat.SampleRate;
@@ -69,19 +78,13 @@ namespace Defalt {
             chorus2.Depth = 20.0f;
             chorus2.Phase = ChorusPhase.Neg180;
             chorus2.WetDryMix = 70.0f;
-            var srcDistortion = new DmoEffectWaveProvider<DmoDistortion, DmoDistortion.Params>(srcChorus2);
-            var distortion = srcDistortion.EffectParams;
-            distortion.Gain = -10.0f;
-            distortion.Edge = 10.0f;
-            distortion.PostEqCenterFrequency = 5000.0f;
-            distortion.PostEqBandWidth = 700.0f;
-            distortion.PreLowPassCutoff = 6000.0f;
+            
             /*var srcGargle = new DmoEffectWaveProvider<DmoGargle, DmoGargle.Params>(srcDistortion);
             var gargle = srcGargle.EffectParams;
             gargle.RateHz = 800;
             gargle.WaveShape = GargleWaveShape.Square;*/
             //_sourceSampleProvider = new WaveToSampleProvider(srcGargle);
-            _sourceSampleProvider = new WaveToSampleProvider(srcDistortion);
+            _sourceSampleProvider = new WaveToSampleProvider(srcChorus2);
         }
 
         public int Read(float[] buffer, int offset, int count) {
@@ -91,7 +94,7 @@ namespace Defalt {
             if (_shiftTimer <= 0) {
                 _shiftTimer = _minShiftDelay + (int) (_r.NextDouble() * _rangeShiftDelay);
                 if (_r.NextDouble() < 0.5)
-                    shiftTarget = (float) (0.8f + _r.NextDouble() * 0.1f);
+                    shiftTarget = (float) (0.9f + _r.NextDouble() * 0.1f);
                 else
                     shiftTarget = (float) (1.2f + _r.NextDouble() * 0.1f);
             }
@@ -100,6 +103,8 @@ namespace Defalt {
 
             if (_volShift > _volThreshold)
                 shiftTarget = (float) (1.0f + VolBase + _r.NextDouble() * VolRange);
+
+            shiftTarget = Math.Clamp(shiftTarget, AbsoluteMin, AbsoluteMax);
 
             shiftTarget -= _realBase;
             read = 0;
