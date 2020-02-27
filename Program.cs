@@ -27,13 +27,16 @@ namespace Defalt {
             }
 
             Console.WriteLine("Press Enter to start.");
-            while (Console.ReadKey(true).Key != ConsoleKey.Enter) {
+            ConsoleKeyInfo k;
+            bool ex;
+            while (!(ex = !((k = Console.ReadKey(true)).Key != ConsoleKey.C || (k.Modifiers & ConsoleModifiers.Control) != ConsoleModifiers.Control)) && k.Key != ConsoleKey.Enter) {
+                if (ex)
+                    return;
             }
 
             instance.Start(inPath, threshold, 0, 0.1f, noSave ? default : Gen("."));
             Console.WriteLine("Press CTRL-C to end.");
             Console.ReadKey(true);
-            ConsoleKeyInfo k;
             while ((k = Console.ReadKey(true)).Key != ConsoleKey.C ||
                    (k.Modifiers & ConsoleModifiers.Control) != ConsoleModifiers.Control) {
             }
