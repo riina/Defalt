@@ -5,6 +5,8 @@ using NAudio.Wave.SampleProviders;
 
 namespace Defalt {
     public class DefaltSampleProvider : ISampleProvider {
+        private const float ModPeriod = 1.3f;
+        private const float ModAmplitude = 0.2f;
         private const float PitchStepsPerSecond = 30.0f;
         private const float MinShiftDelay = 0.5f;
         private const float MaxShiftDelay = 3.0f;
@@ -19,24 +21,30 @@ namespace Defalt {
         private readonly SmbPitchShiftingSampleProvider _shifter;
 
         //private readonly int _reverseStep;
+        private readonly float _periodInSamples;
         private readonly int _pitchStep;
         private readonly int _minShiftDelay;
         private readonly int _rangeShiftDelay;
         private readonly Random _r;
         private readonly float _volThreshold;
 
+        private long _sample;
         private int _shiftTimer;
         private float _volShift;
+        private float _realBase;
 
         public DefaltSampleProvider(ISampleProvider sourceSampleProvider, float threshold) {
             _shifter = new SmbPitchShiftingSampleProvider(sourceSampleProvider,
                 512, 10, 0.8f);
             //_reverseStep = (int) (ReverseMax * sourceWaveProvider.WaveFormat.SampleRate);
+            _periodInSamples = ModPeriod * sourceSampleProvider.WaveFormat.SampleRate;
             _pitchStep = Math.Max(1, (int) (sourceSampleProvider.WaveFormat.SampleRate / PitchStepsPerSecond));
             _minShiftDelay = (int) (MinShiftDelay * sourceSampleProvider.WaveFormat.SampleRate);
             _rangeShiftDelay = (int) ((MaxShiftDelay - MinShiftDelay) * sourceSampleProvider.WaveFormat.SampleRate);
-            _volThreshold = threshold;
             _r = new Random();
+            _volThreshold = threshold;
+
+            _realBase = 1.0f;
 
             var altSrc = new MeteringSampleProvider(_shifter);
             altSrc.SamplesPerNotification = (int) (VolumeSlice * sourceSampleProvider.WaveFormat.SampleRate);
@@ -78,7 +86,6 @@ namespace Defalt {
 
         public int Read(float[] buffer, int offset, int count) {
             int read;
-            var shiftSource = _shifter.PitchFactor;
             float shiftTarget;
             _shiftTimer -= count;
             if (_shiftTimer <= 0) {
@@ -89,23 +96,26 @@ namespace Defalt {
                     shiftTarget = (float) (1.2f + _r.NextDouble() * 0.1f);
             }
             else
-                shiftTarget = shiftSource;
+                shiftTarget = _realBase;
 
             if (_volShift > _volThreshold)
                 shiftTarget = (float) (1.0f + VolBase + _r.NextDouble() * VolRange);
 
-            shiftTarget -= shiftSource;
+            shiftTarget -= _realBase;
             read = 0;
             int readI;
             for (var i = 0; i < count && read < count; i += readI) {
-                _shifter.PitchFactor = shiftSource + shiftTarget * ((float) i / count);
+
+                var sinMod = (float)(ModAmplitude * Math.Sin(_sample * 2 * Math.PI / _periodInSamples));
+                _shifter.PitchFactor = _realBase + shiftTarget * ((float) i / count) + sinMod;
                 readI = _sourceSampleProvider.Read(buffer, offset + i, Math.Min(_pitchStep, count - read));
                 read += readI;
+                _sample += readI;
                 if (readI == 0)
                     break;
             }
 
-            _shifter.PitchFactor = shiftSource + shiftTarget;
+            _realBase += shiftTarget;
             //var e = offset + read;
 
             // if (r < 0.2) {
